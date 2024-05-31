@@ -1,6 +1,3 @@
-# YOLOv9
-
-
 **changed coco.yaml**
 
 **changed yolov9-c.yaml**
@@ -10,6 +7,17 @@
 **changed utils/general.py line 903 ,, addad [1]**
 
 **changed detect.py for reading text from liscence**
+
+
+
+
+
+
+
+
+# YOLOv9
+
+
 
 
 
