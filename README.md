@@ -1,5 +1,33 @@
 # YOLOv9
 
+
+changed coco.yaml
+changed yolov9-c.yaml
+changed yolov9-e.yaml
+
+changed utils/general.py line 903 ,, addad [1]
+changed detect.py for reading text from liscence
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Implementation of paper - [YOLOv9: Learning What You Want to Learn Using Programmable Gradient Information](https://arxiv.org/abs/2402.13616)
 
 [![arxiv.org](http://img.shields.io/badge/cs.CV-arXiv%3A2402.13616-B31B1B.svg)](https://arxiv.org/abs/2402.13616)
