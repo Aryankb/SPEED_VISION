@@ -178,6 +178,7 @@ def run(
 
 
 
+
                         annotator.box_label(xyxy, label, color=colors(c, True))
 
                         
