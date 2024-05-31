@@ -1,0 +1,70 @@
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f5f5f5;
+    margin: 0;
+    padding: 0;
+}
+
+.video-container {
+    position: relative;
+}
+
+#videoPlayer {
+    display: block;
+    position: relative;
+    z-index: 1;
+}
+
+#videoCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 2;
+}
+
+
+h1 {
+    text-align: center;
+    color: #333;
+}
+
+form {
+    text-align: center;
+}
+
+label {
+    display: block;
+    margin-bottom: 5px;
+}
+
+input[type="text"],
+input[type="file"],
+input[type="submit"] {
+    display: block;
+    margin: 10px auto;
+    padding: 10px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+canvas {
+    display: block;
+    margin: 20px auto;
+    border: 2px solid #333;
+}
+
+#detectButton {
+    display: block;
+    margin: 20px auto;
+    padding: 10px 20px;
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#detectButton:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+}
