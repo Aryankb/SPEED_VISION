@@ -1,5 +1,5 @@
 import os
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify
 
 app = Flask(__name__)
 
@@ -36,6 +36,37 @@ def upload():
         return render_template('index.html', video_path=video_path)
 
     return "Video uploaded successfully!"
+
+@app.route('/detect', methods=['POST'])
+def detect():
+    data = request.get_json()
+    first_line_start = data['firstLineStart']
+    first_line_end = data['firstLineEnd']
+    second_line_start = data['secondLineStart']
+    second_line_end = data['secondLineEnd']
+
+    # Placeholder for actual detection logic
+    print(f'First Line Start: {first_line_start}')
+    print(f'First Line End: {first_line_end}')
+    print(f'Second Line Start: {second_line_start}')
+    print(f'Second Line End: {second_line_end}')
+    
+    # Example response
+    result = {
+        'status': 'success',
+        'message': 'Detection complete',
+        'data': {
+            'firstLine': {
+                'start': first_line_start,
+                'end': first_line_end
+            },
+            'secondLine': {
+                'start': second_line_start,
+                'end': second_line_end
+            }
+        }
+    }
+    return jsonify(result)
 
 if __name__ == '__main__':
     app.run(debug=True)

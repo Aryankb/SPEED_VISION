@@ -88,7 +88,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Event listener for overspeeding button
     document.getElementById('detectButton').addEventListener('click', () => {
-        // Logic for detecting overspeeding vehicles
-        alert('Detecting overspeeding vehicles...');
+        // Send coordinates to the backend
+        const data = {
+            firstLineStart: firstLineStart,
+            firstLineEnd: firstLineEnd,
+            secondLineStart: secondLineStart,
+            secondLineEnd: secondLineEnd
+        };
+
+        fetch('/detect', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            console.log('Success:', result);
+            alert('Detection complete. Check the console for results.');
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('An error occurred during detection.');
+        });
     });
 });
