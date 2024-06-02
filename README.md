@@ -12,6 +12,56 @@
 
 
 
+# INSTALLATION_FOR_SPEED_VISION
+can use docker if want follow the installation guide **below** if using docker
+
+make virtual env / conda env with python 3.10.11
+
+cloone the repo
+
+go into project folder
+
+install nvidia gpu driver if gpu available (chat gpt se puch lena kaise kar)
+
+pip install -r requirements.txt (do this after removing torch and torchvision from requirements.txt if GPU AVAILABLE)
+
+if gpu not available simple install requirements.txt
+
+install torch Version: 2.1.0+cu118 and torchvision Version: 0.16.0+cu118 if GPU available
+
+pip install "paddleocr>=2.0.1"
+
+pip install prox
+
+pip install common
+
+data
+
+tight
+
+dual
+
+flask
+
+pip install paddle
+
+pip install paddlepaddle
+
+ultralytics
+
+motpy
+
+collections
+
+math
+
+subprocess
+
+csv
+
+change the command in app.py for sourcing and environment activation according to your pc directories
+
+if not using gpu, in the command in app.py , write cpu in place of 0  in --device 0
 
 
 
