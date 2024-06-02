@@ -63,6 +63,9 @@ change the command in app.py for sourcing and environment activation according t
 
 if not using gpu, in the command in app.py , write cpu in place of 0  in --device 0
 
+Install some additional files if they are the dependencies of other installed files (error aa jayega to dikh jayega kya install krna hai)
+
+go into env and **python app.py**
 
 
 # YOLOv9
