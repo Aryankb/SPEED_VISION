@@ -1,6 +1,6 @@
 import os
 from flask import Flask, render_template, request, jsonify
-
+import subprocess
 app = Flask(__name__)
 
 UPLOAD_FOLDER = 'static'
@@ -54,12 +54,6 @@ def detect():
     threshold_speed = data['thresholdSpeed']
     distance = data['distance']
 
-        
-
-
-
-
-
     # Placeholder for actual detection logic
     print(f'Video Name: {video_name}')
     print(f'First Line Start: {first_line_start}')
@@ -69,9 +63,12 @@ def detect():
     print(f'Threshold Speed: {threshold_speed}')
     print(f'Distance: {distance}')
 
-    import subprocess
-    line_coordss=[first_line_start["x"],first_line_start["y"],first_line_end["x"],first_line_end["y"],second_line_start["x"],second_line_start["y"],second_line_end["x"],second_line_end["y"]]
+    line_coordss = [
+        first_line_start["x"], first_line_start["y"], first_line_end["x"], first_line_end["y"],
+        second_line_start["x"], second_line_start["y"], second_line_end["x"], second_line_end["y"]
+    ]
 
+    line_coordss = map(int,line_coordss)
     if not (video_name and filename and threshold_speed and distance and line_coordss):
         return jsonify({'status': 'error', 'message': 'Missing required parameters'}), 400
 
@@ -79,21 +76,21 @@ def detect():
     line_coords_str = ' '.join(map(str, line_coordss))
 
     # Construct the command
-    command = f'source /home/aryan/miniconda3/etc/profile.d/conda.sh && conda activate speed && python detect.py --conf 0.2 --device 0 --weights runs/train/exp10/weights/best.pt --source static/{video_name}/detected_{filename} --project static/{video_name} --line_coords {line_coords_str} --threshold {threshold_speed} --DISTAN {distance}'
+    command = f'source /home/aryan/miniconda3/etc/profile.d/conda.sh && conda activate speed && python detect.py --conf 0.2 --device 0 --weights runs/train/exp10/weights/best.pt --project static/"{video_name}"/"detected_{filename}" --source static/"{video_name}"/"{filename}" --linecoordss {line_coords_str} --threshold {threshold_speed} --DISTAN {distance}'
+
+    print(f'Running command: {command}')
 
     try:
         process = subprocess.run(command, shell=True, capture_output=True, text=True, executable='/bin/bash')
+        print(f'Process return code: {process.returncode}')
+        print(f'Process stdout: {process.stdout}')
+        print(f'Process stderr: {process.stderr}')
         if process.returncode == 0:
             return jsonify({'status': 'success', 'output': process.stdout})
         else:
             return jsonify({'status': 'error', 'message': process.stderr}), 400
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
-    
-    
-    
-
-    
 
 if __name__ == '__main__':
     app.run(debug=True)
