@@ -21,6 +21,12 @@
             <canvas id="videoCanvas"></canvas>
         </div>
         <input type="hidden" id="videoPath" value="{{ video_path }}">
+        <div>
+            <label for="thresholdSpeed">Threshold Speed:</label>
+            <input type="number" id="thresholdSpeed" name="thresholdSpeed" required>
+            <label for="distance">Distance (in meters):</label>
+            <input type="number" id="distance" name="distance" required>
+        </div>
         <button id="detectButton" disabled>Detect Overspeeding Vehicles</button>
     </div>
     <script src="{{ url_for('static', filename='script.js') }}"></script>

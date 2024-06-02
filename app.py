@@ -10,8 +10,12 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 def index():
     return render_template('index.html')
 
+video_name=""
+filename=""
 @app.route('/upload', methods=['POST'])
 def upload():
+    global video_name
+    global filename
     if 'videoFile' not in request.files:
         return "No video file uploaded", 400
 
@@ -39,34 +43,57 @@ def upload():
 
 @app.route('/detect', methods=['POST'])
 def detect():
+    global video_name
+    global filename
+    
     data = request.get_json()
     first_line_start = data['firstLineStart']
     first_line_end = data['firstLineEnd']
     second_line_start = data['secondLineStart']
     second_line_end = data['secondLineEnd']
+    threshold_speed = data['thresholdSpeed']
+    distance = data['distance']
+
+        
+
+
+
+
 
     # Placeholder for actual detection logic
+    print(f'Video Name: {video_name}')
     print(f'First Line Start: {first_line_start}')
     print(f'First Line End: {first_line_end}')
     print(f'Second Line Start: {second_line_start}')
     print(f'Second Line End: {second_line_end}')
+    print(f'Threshold Speed: {threshold_speed}')
+    print(f'Distance: {distance}')
+
+    import subprocess
+    line_coordss=[first_line_start["x"],first_line_start["y"],first_line_end["x"],first_line_end["y"],second_line_start["x"],second_line_start["y"],second_line_end["x"],second_line_end["y"]]
+
+    if not (video_name and filename and threshold_speed and distance and line_coordss):
+        return jsonify({'status': 'error', 'message': 'Missing required parameters'}), 400
+
+    # Convert list of coordinates to a string
+    line_coords_str = ' '.join(map(str, line_coordss))
+
+    # Construct the command
+    command = f'source /home/aryan/miniconda3/etc/profile.d/conda.sh && conda activate speed && python detect.py --conf 0.2 --device 0 --weights runs/train/exp10/weights/best.pt --source static/{video_name}/detected_{filename} --project static/{video_name} --line_coords {line_coords_str} --threshold {threshold_speed} --DISTAN {distance}'
+
+    try:
+        process = subprocess.run(command, shell=True, capture_output=True, text=True, executable='/bin/bash')
+        if process.returncode == 0:
+            return jsonify({'status': 'success', 'output': process.stdout})
+        else:
+            return jsonify({'status': 'error', 'message': process.stderr}), 400
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
     
-    # Example response
-    result = {
-        'status': 'success',
-        'message': 'Detection complete',
-        'data': {
-            'firstLine': {
-                'start': first_line_start,
-                'end': first_line_end
-            },
-            'secondLine': {
-                'start': second_line_start,
-                'end': second_line_end
-            }
-        }
-    }
-    return jsonify(result)
+    
+    
+
+    
 
 if __name__ == '__main__':
     app.run(debug=True)

@@ -88,12 +88,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Event listener for overspeeding button
     document.getElementById('detectButton').addEventListener('click', () => {
-        // Send coordinates to the backend
+        // Collect input values
+        const thresholdSpeed = document.getElementById('thresholdSpeed').value;
+        const distance = document.getElementById('distance').value;
+
+        // Send coordinates and other data to the backend
         const data = {
             firstLineStart: firstLineStart,
             firstLineEnd: firstLineEnd,
             secondLineStart: secondLineStart,
-            secondLineEnd: secondLineEnd
+            secondLineEnd: secondLineEnd,
+            thresholdSpeed: thresholdSpeed,
+            distance: distance
         };
 
         fetch('/detect', {
@@ -105,12 +111,17 @@ document.addEventListener('DOMContentLoaded', () => {
         })
         .then(response => response.json())
         .then(result => {
-            console.log('Success:', result);
-            alert('Detection complete. Check the console for results.');
+            if (result.status === 'success') {
+                console.log('Success:', result);
+                alert('Detection complete. Check the console for results.');
+            } else {
+                console.error('Detection failed:', result);
+                alert('Detection failed. Check the console for details.');
+            }
         })
         .catch(error => {
             console.error('Error:', error);
-            alert('An error occurred during detection.');
+            alert('An error occurred during detection. Check the console for details.');
         });
     });
 });

@@ -3,8 +3,21 @@ import os
 import platform
 import sys
 from pathlib import Path
-
 import torch
+import time
+from motpy import Detection, MultiObjectTracker
+from collections import namedtuple
+import cv2
+import pandas as pd
+from ultralytics import YOLO
+import math
+from collections import Counter,defaultdict 
+
+
+
+
+
+
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[0]  # YOLO root directory
@@ -23,21 +36,70 @@ from utils.torch_utils import select_device, smart_inference_mode
 
 
 
-
-import easyocr
+from paddleocr import PaddleOCR
 import cv2
-reader=easyocr.Reader(['en'],gpu=True)
+ocr = PaddleOCR(lang='en') # need to run only once to load model into memory
 
 def perform_ocr_on_image(img,coord):
     x,y,w,h=map(int,coord)
+    H, W, _ = img.shape
+
+
+    # Ensure bounding box coordinates are within image dimensions
+    if x < 0 or y < 0 or w > W or h>H:
+        print(f"Warning: Bounding box {coord} is out of image bounds.")
+        return ""
     cropped_img=img[y:h,x:w]
-    gray_img=cv2.cvtColor(cropped_img,cv2.COLOR_RGB2GRAY)
-    results=reader.readtext(gray_img)
-    text=""
-    for res in results:
-        if len(results)==1 or (len(res[1])>6 and res[2]>0.2):
-            text=res[1]
-    return str(text)
+    if cropped_img.size == 0:
+        print(f"Warning: Cropped image for bounding box {coord} is empty.")
+        return ""
+    
+
+    txt=""
+    
+    result = ocr.ocr(cropped_img, det=False, cls=False)
+    for idx in range(len(result)):
+        res = result[idx]
+        for line in res:
+            txt+=line[0]
+    return str(txt)
+
+def calculate_fps(video_path):
+    # Open the video file
+    video = cv2.VideoCapture(video_path)
+    
+    # Get the FPS (frames per second)
+    fps = video.get(cv2.CAP_PROP_FPS)
+    
+    # Release the video capture object
+    video.release()
+    
+    return fps
+def distance_from_line(cx, cy, sx, sy, ex, ey):
+    if ex - sx != 0:
+        slope = (ey - sy) / (ex - sx)
+        constant = sy - slope * sx
+        return abs((slope * cx - cy + constant)) / math.sqrt(slope**2 + 1)
+    else:
+        return abs(cx - sx)
+def calculate_intersection(rect1, rect2):
+    # Extract coordinates
+    x1_1, y1_1, x2_1, y2_1 = rect1
+    x1_2, y1_2, x2_2, y2_2 = rect2
+    
+    # Calculate the coordinates of the intersection rectangle
+    x_left = max(x1_1, x1_2)
+    y_top = max(y1_1, y1_2)
+    x_right = min(x2_1, x2_2)
+    y_bottom = min(y2_1, y2_2)
+    
+    # Check if there is an intersection
+    if x_right < x_left or y_bottom < y_top:
+        return 0.0
+    
+    # Area of intersection
+    intersection_area = (x_right - x_left) * (y_bottom - y_top)
+    return intersection_area
 
 
 @smart_inference_mode()
@@ -50,7 +112,7 @@ def run(
         iou_thres=0.45,  # NMS IOU threshold
         max_det=1000,  # maximum detections per image
         device='',  # cuda device, i.e. 0 or 0,1,2,3 or cpu
-        view_img=False,  # show results
+        view_img=True,  # show results
         save_txt=False,  # save results to *.txt
         save_conf=False,  # save confidences in --save-txt labels
         save_crop=False,  # save cropped prediction boxes
@@ -69,7 +131,13 @@ def run(
         half=False,  # use FP16 half-precision inference
         dnn=False,  # use OpenCV DNN for ONNX inference
         vid_stride=1,  # video frame-rate stride
+        linecoordss=ROOT,
+        threshold=ROOT,
+        DISTAN=ROOT
 ):
+    
+    fPs=calculate_fps(source)
+    l1sx,l1sy,l1ex,l1ey,l2sx,l2sy,l2ex,l2ey=linecoordss
     source = str(source)
     save_img = not nosave and not source.endswith('.txt')  # save inference images
     is_file = Path(source).suffix[1:] in (IMG_FORMATS + VID_FORMATS)
@@ -104,6 +172,29 @@ def run(
     # Run inference
     model.warmup(imgsz=(1 if pt or model.triton else bs, 3, *imgsz))  # warmup
     seen, windows, dt = 0, [], (Profile(), Profile(), Profile())
+    # Initialize the YOLO model
+    modelll = YOLO('yolov8s.pt')
+
+    # Define the class list
+    class_list = ['person', 'bicycle', 'car', 'motorcycle', 'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light', 
+                'fire hydrant', 'stop sign', 'parking meter', 'bench', 'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 
+                'elephant', 'bear', 'zebra', 'giraffe', 'backpack', 'umbrella', 'handbag', 'tie', 'suitcase', 'frisbee', 
+                'skis', 'snowboard', 'sports ball', 'kite', 'baseball bat', 'baseball glove', 'skateboard', 'surfboard', 
+                'tennis racket', 'bottle', 'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl', 'banana', 'apple', 
+                'sandwich', 'orange', 'broccoli', 'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair', 'couch', 
+                'potted plant', 'bed', 'dining table', 'toilet', 'tv', 'laptop', 'mouse', 'remote', 'keyboard', 
+                'cell phone', 'microwave', 'oven', 'toaster', 'sink', 'refrigerator', 'book', 'clock', 'vase', 
+                'scissors', 'teddy bear', 'hair drier', 'toothbrush']
+
+    # Initialize variables
+    count = 0
+    up = {}
+    counter_up = []
+    speeD = defaultdict(lambda:[0,[]])
+
+    # Initialize the motpy tracker
+    tracker = MultiObjectTracker(dt=1/fPs)  # You may need to adjust the dt parameter based on your frame rate
+    FrameS=1
     for path, im, im0s, vid_cap, s in dataset:
         with dt[0]:
             im = torch.from_numpy(im).to(model.device)
@@ -124,6 +215,21 @@ def run(
         # Second-stage classifier (optional)
         # pred = utils.general.apply_classifier(pred, classifier_model, im, im0s)
 
+
+
+
+
+
+        
+
+        
+
+        # Define the distance between the lines (in meters)
+        # DISTAN = 10
+
+        # Function to calculate distance from a point to a line
+        
+
         # Process predictions
         for i, det in enumerate(pred):  # per image
             seen += 1
@@ -137,9 +243,101 @@ def run(
             save_path = str(save_dir / p.name)  # im.jpg
             txt_path = str(save_dir / 'labels' / p.stem) + ('' if dataset.mode == 'image' else f'_{frame}')  # im.txt
             s += '%gx%g ' % im.shape[2:]  # print string
+            original_shape=im0.shape
+            count += 1
+            im0 = cv2.resize(im0, (1020, 500))
+
+            results = modelll.predict(im0)
+            a = results[0].boxes.data
+            a = a.detach().cpu().numpy()
+            px = pd.DataFrame(a).astype("float")
+            detections = []
+
+            for index, row in px.iterrows():
+                x1 = int(row[0])
+                y1 = int(row[1])
+                x2 = int(row[2])
+                y2 = int(row[3])
+                d = int(row[5])
+                c = class_list[d]
+                if 'car' in c or 'motorcycle' in c or 'bus' in c or 'truck' in c:
+                    detections.append(Detection(box=[x1, y1, x2, y2]))
+
+            tracker.step(detections)
+            tracked_objects = tracker.active_tracks()
+
+            for obj in tracked_objects:
+                x3, y3, x4, y4 = obj.box
+                cx = (int(x3) + int(x4)) // 2
+                cy = (int(y3) + int(y4)) // 2
+                id = obj.id
+                x3=int(x3)
+                y3=int(y3)
+                x4=int(x4)
+                y4=int(y4)
+                if int(x3) and int(y3) and int(x4) and int(y4):
+                    try:
+                        cv2.rectangle(im0, (int(x3), int(y3)), (int(x4), int(y4)), (255, 255, 0), 2)  # Draw a blue box
+                    except:
+                        pass
+                    cv2.circle(im0, (cx, cy), 4, (0, 0, 255), -1)
+                    # Calculate distances from the lines
+                    distance1 = distance_from_line(cx, cy, l1sx, l1sy, l1ex, l1ey)
+                    distance2 = distance_from_line(cx, cy, l2sx, l2sy, l2ex, l2ey)
+
+                    if distance1 < 6:
+                        up[id] = FrameS
+                        cv2.circle(im0, (cx, cy), 4, (0, 255, 0), -1)
+                    if id in up:
+                        if id not in speeD:
+                            cv2.circle(im0, (cx, cy), 4, (0, 255, 0), -1)
+                        if distance2 < 6:
+                            elapsed1_time = (FrameS - up[id])/fPs
+                            cv2.circle(im0, (cx, cy), 4, (0, 0, 255), -1)
+                            if counter_up.count(id) == 0:
+                                counter_up.append(id)
+                                a_speed_ms1 = DISTAN / elapsed1_time
+                                a_speed_kh1 = a_speed_ms1 * 3.6
+                                
+                                cv2.rectangle(im0, (int(x3), int(y3)), (int(x4), int(y4)), (0, 255, 0), 2)  # Draw bounding box
+                                cv2.putText(im0, str(id), (x3, y3), cv2.FONT_HERSHEY_COMPLEX, 0.6, (255, 255, 255), 1)
+                                cv2.putText(im0, str(int(a_speed_kh1)) + 'Km/h', (x4, y4), cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 255, 255), 2)
+                                speeD[id][0] = a_speed_kh1
+
+
+            text_color = (0, 0, 0)  # Black color for text
+            yellow_color = (0, 255, 255)  # Yellow color for background
+            red_color = (0, 0, 255)  # Red color for lines
+            blue_color = (255, 0, 0)  # Blue color for lines
+
+            cv2.line(im0, (l1sx, l1sy), (l1ex, l1ey), red_color, 2)
+            cv2.putText(im0, ('1st Line'), (l1sx, l1sy), cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1, cv2.LINE_AA)
+
+            cv2.line(im0, (l2sx, l2sy), (l2ex, l2ey), blue_color, 2)
+            cv2.putText(im0, ('2nd Line'), (l2sx, l2sy), cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1, cv2.LINE_AA)
+            cv2.rectangle(im0, (0, 0), (250, 90), yellow_color, -1)
+            cv2.putText(im0, ('COUNT - ' + str(len(counter_up))), (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, text_color, 1, cv2.LINE_AA)
+
+            
+
+
+            ######################################################################################################
+            im0=cv2.resize(im0,(original_shape[1],original_shape[0]))
             gn = torch.tensor(im0.shape)[[1, 0, 1, 0]]  # normalization gain whwh
             imc = im0.copy() if save_crop else im0  # for save_crop
             annotator = Annotator(im0, line_width=line_thickness, example=str(names))
+
+
+
+
+
+
+
+
+
+
+
+
             if len(det):
                 # Rescale boxes from img_size to im0 size
                 det[:, :4] = scale_boxes(im.shape[2:], det[:, :4], im0.shape).round()
@@ -167,10 +365,25 @@ def run(
 
                         text_ocr=perform_ocr_on_image(im0,xyxy)
                         label=text_ocr
-                        #########################################################################
-                        #speed detection
+                        maxi_id=""
+                        for bbox in tracked_objects:
+                            x3, y3, x4, y4 = bbox.box
+                            id=bbox.id
+                            x,y,w,h=map(int,xyxy)
+                            rect1=[x3,y3,x4,y4]
+                            rect2=[x,y,w,h]
+                            intersection=calculate_intersection(rect1,rect2)
+                            if intersection==abs(x-w)*abs(y-h):
+                                maxi_id=id
+                                break
+                        if maxi_id!="":
+                            
+                            speeD[maxi_id][1].append(label)
+                                
                         
-                        ###########################33
+
+
+
 
 
 
@@ -190,14 +403,18 @@ def run(
                         
 
             # Stream results
+            
             im0 = annotator.result()
-            if view_img:
-                if platform.system() == 'Linux' and p not in windows:
-                    windows.append(p)
-                    cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # allow window resize (Linux)
-                    cv2.resizeWindow(str(p), im0.shape[1], im0.shape[0])
-                cv2.imshow(str(p), im0)
-                cv2.waitKey(1)  # 1 millisecond
+            cv2.imshow('Frame', im0)
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+            # if view_img:
+            #     if platform.system() == 'Linux' and p not in windows:
+            #         windows.append(p)
+            #         cv2.namedWindow(str(p), cv2.WINDOW_NORMAL | cv2.WINDOW_KEEPRATIO)  # allow window resize (Linux)
+            #         cv2.resizeWindow(str(p), im0.shape[1], im0.shape[0])
+            #     cv2.imshow(str(p), im0)
+            #     cv2.waitKey(1)  # 1 millisecond
 
             # Save results (image with detections)
             if save_img:
@@ -217,9 +434,12 @@ def run(
                         save_path = str(Path(save_path).with_suffix('.mp4'))  # force *.mp4 suffix on results videos
                         vid_writer[i] = cv2.VideoWriter(save_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (w, h))
                     vid_writer[i].write(im0)
+        
+        FrameS+=1
 
         # Print time (inference-only)
         LOGGER.info(f"{s}{'' if len(det) else '(no detections), '}{dt[1].dt * 1E3:.1f}ms")
+    
 
     # Print results
     t = tuple(x.t / seen * 1E3 for x in dt)  # speeds per image
@@ -229,6 +449,24 @@ def run(
         LOGGER.info(f"Results saved to {colorstr('bold', save_dir)}{s}")
     if update:
         strip_optimizer(weights[0])  # update model (to fix SourceChangeWarning)
+
+
+
+    import csv
+    with open(project+'results.csv', 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(["speed","liscence","overspeeding"])
+        for speed_lisc in speeD.values():
+            try:
+                if int(speed_lisc[0])>threshold:
+                
+                    writer.writerow([speed_lisc[0],Counter(speed_lisc[1]).most_common(1)[0][0],"Y"])
+                else:
+                    writer.writerow([speed_lisc[0],Counter(speed_lisc[1]).most_common(1)[0][0],"N"])
+
+            except:
+                pass
+
 
 
 def parse_opt():
@@ -260,6 +498,9 @@ def parse_opt():
     parser.add_argument('--half', action='store_true', help='use FP16 half-precision inference')
     parser.add_argument('--dnn', action='store_true', help='use OpenCV DNN for ONNX inference')
     parser.add_argument('--vid-stride', type=int, default=1, help='video frame-rate stride')
+    parser.add_argument('--linecoordss', nargs='+', type=int, default=[10, 500, 500, 500, 10, 250, 250, 250], help='Coordinates of the lines')
+    parser.add_argument('--threshold', type=int, default=10, help='Threshold value')
+    parser.add_argument('--DISTAN', type=int, default=10, help='Distance value')
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args(vars(opt))
@@ -272,5 +513,6 @@ def main(opt):
 
 
 if __name__ == "__main__":
+    
     opt = parse_opt()
     main(opt)
