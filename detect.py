@@ -302,7 +302,7 @@ def run(
                                 cv2.rectangle(im0, (int(x3), int(y3)), (int(x4), int(y4)), (0, 255, 0), 2)  # Draw bounding box
                                 cv2.putText(im0, str(id), (x3, y3), cv2.FONT_HERSHEY_COMPLEX, 0.6, (255, 255, 255), 1)
                                 cv2.putText(im0, str(int(a_speed_kh1)) + 'Km/h', (x4, y4), cv2.FONT_HERSHEY_COMPLEX, 0.8, (0, 255, 255), 2)
-                                speeD[id][0] = a_speed_kh1
+                                speeD[id][0] = round(a_speed_kh1,2)
 
 
             text_color = (0, 0, 0)  # Black color for text
@@ -366,6 +366,7 @@ def run(
                         text_ocr=perform_ocr_on_image(im0,xyxy)
                         label=text_ocr
                         maxi_id=""
+                        smdiff=1e10
                         for bbox in tracked_objects:
                             x3, y3, x4, y4 = bbox.box
                             id=bbox.id
@@ -373,12 +374,11 @@ def run(
                             rect1=[x3,y3,x4,y4]
                             rect2=[x,y,w,h]
                             intersection=calculate_intersection(rect1,rect2)
-                            if intersection==abs(x-w)*abs(y-h):
+                            if (intersection-abs(x-w)*abs(y-h))<smdiff:
                                 maxi_id=id
-                                break
-                        if maxi_id!="":
-                            
-                            speeD[maxi_id][1].append(label)
+                                smdiff=(intersection-abs(x-w)*abs(y-h))
+
+                        speeD[maxi_id][1].append(label.replace(" ",""))
                                 
                         
 
