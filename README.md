@@ -1,5 +1,5 @@
 # DISCLAIMER
-Hey, i tried to create a vehicle speeed detection and no. plate capturing system by modifying the code base and fine tuning of YOLO V9 Model.
+Hey, i have created a vehicle speed detection and no. plate capturing system by modifying the code base and fine tuning of YOLO V9 Model.
 
 # VIDEOS
 
