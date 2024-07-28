@@ -4,15 +4,15 @@ Hey, i tried to create a vehicle speeed detection and no. plate capturing system
 # VIDEOS
 
 # FEW THINGS TO NOTE
-**changed coco.yaml**
+**changed coco.yaml for training**
 
-**changed yolov9-c.yaml**
+**changed yolov9-c.yaml for training**
 
-**changed yolov9-e.yaml**
+**changed yolov9-e.yaml for training**
 
 **changed utils/general.py line 903 ,, addad [1]**
 
-**changed detect.py for reading text from liscence**
+**changed detect.py for reading text from liscence during detection**
 
 
 
