@@ -3,6 +3,8 @@ Hey, i have created a vehicle speed detection and no. plate capturing system by 
 
 # VIDEOS
 
+<iframe width="560" height="315" src="https://www.youtube.com/embed/3qOFcsrOWqo?si=PiXc90hDUTXE4Ji0" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
 # FEW THINGS TO NOTE
 **changed coco.yaml for training**
 
